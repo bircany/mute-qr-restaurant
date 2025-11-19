@@ -9,19 +9,38 @@ import Footer from '@/components/Footer'
 import MenuSection from '@/components/MenuSection'
 import { fetchMenuData, MenuItem } from '@/lib/googleSheets'
 
-// Kategori bilgileri
+// Kategori bilgileri - Google Sheets'teki kategorilere göre güncellendi
 const categoryInfo: Record<string, { title: string; description: string; icon: string }> = {
-  'baslangiclar': { title: 'Başlangıçlar', description: 'Sıcak çorbalar ile başlayın', icon: 'soup' },
-  'mezeler': { title: 'Mezeler', description: 'Soğuk mezeler ve lezzetler', icon: 'dish' },
-  'ara-sicaklar': { title: 'Ara Sıcaklar', description: 'Sıcak atıştırmalıklar', icon: 'flame' },
-  'salatalar': { title: 'Salatalar', description: 'Taze ve sağlıklı', icon: 'salad' },
+  'sicak-mezeler': { title: 'Sıcak Mezeler', description: 'Sıcak mezeler ve lezzetler', icon: 'flame' },
+  'soguk-mezeler': { title: 'Soğuk Mezeler', description: 'Soğuk mezeler ve lezzetler', icon: 'dish' },
   'ana-yemekler': { title: 'Ana Yemekler', description: 'Közden gelen lezzetler', icon: 'meat' },
-  'spesyaller': { title: 'Spesyaller', description: 'Özel tariflerimiz', icon: 'star' },
-  'tatlilar': { title: 'Tatlılar', description: 'Geleneksel tatlılar', icon: 'cake' },
-  'icecekler': { title: 'İçecekler', description: 'Sıcak ve soğuk içecekler', icon: 'coffee' },
-  'alkoller': { title: 'Alkoller', description: 'Rakı, şarap, bira ve daha fazlası', icon: 'wine' },
-  'aperatifler': { title: 'Aperatifler', description: 'Kuruyemiş çeşitleri', icon: 'nuts' },
-  'meyveler': { title: 'Meyveler', description: 'Taze mevsim meyveleri', icon: 'fruit' },
+  'salatalar': { title: 'Salatalar', description: 'Taze ve sağlıklı', icon: 'salad' },
+}
+
+// Slug'dan kategori başlığına dönüştürme fonksiyonu
+function getCategoryTitleFromSlug(slug: string, menuItems: MenuItem[]): string | null {
+  // Önce sabit listede ara
+  if (categoryInfo[slug]) {
+    return categoryInfo[slug].title
+  }
+  
+  // Eğer bulunamazsa, menuItems'tan kategori başlığını bul
+  const allCategories = Array.from(new Set(menuItems.map(item => item.category).filter(Boolean)))
+  const category = allCategories.find(cat => {
+    const categorySlug = cat
+      .toLowerCase()
+      .replace(/ş/g, 's')
+      .replace(/ğ/g, 'g')
+      .replace(/ü/g, 'u')
+      .replace(/ö/g, 'o')
+      .replace(/ı/g, 'i')
+      .replace(/ç/g, 'c')
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '')
+    return categorySlug === slug
+  })
+  
+  return category || null
 }
 
 export default function CategoryPage() {
@@ -31,25 +50,45 @@ export default function CategoryPage() {
   const highlight = searchParams.get('highlight')
   
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
+  const [allMenuItems, setAllMenuItems] = useState<MenuItem[]>([])
   const [loading, setLoading] = useState(true)
-
-  const category = categoryInfo[slug]
+  const [categoryTitle, setCategoryTitle] = useState<string | null>(null)
 
   useEffect(() => {
     async function loadMenu() {
       try {
         const data = await fetchMenuData()
-        setMenuItems(data.filter(item => item.category === category?.title))
+        setAllMenuItems(data)
+        
+        // Önce categoryInfo'dan kontrol et (daha hızlı)
+        let title: string | null = null
+        if (categoryInfo[slug]) {
+          title = categoryInfo[slug].title
+        } else {
+          // Eğer categoryInfo'da yoksa, menuItems'tan bul
+          title = getCategoryTitleFromSlug(slug, data)
+        }
+        
+        setCategoryTitle(title)
+        
+        if (title) {
+          setMenuItems(data.filter(item => item.category === title))
+        }
       } catch (error) {
         console.error('Error loading menu:', error)
       } finally {
         setLoading(false)
       }
     }
-    if (category) {
-      loadMenu()
-    }
-  }, [category])
+    loadMenu()
+  }, [slug])
+
+  // Kategori bilgisini oluştur
+  const category = categoryTitle ? (categoryInfo[slug] || {
+    title: categoryTitle,
+    description: `${categoryTitle} kategorisindeki lezzetler`,
+    icon: 'dish'
+  }) : null
 
   // Highlight özelliği varsa scroll et
   useEffect(() => {
@@ -68,6 +107,19 @@ export default function CategoryPage() {
     }
   }, [highlight, loading])
 
+  // Önce loading kontrolü yap - yükleme sırasında kategori kontrolü yapma
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-copper-500 border-r-transparent mb-4"></div>
+          <p className="text-copper-300 font-playfair text-xl">Yükleniyor...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Yükleme tamamlandıktan sonra kategori kontrolü yap
   if (!category) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -76,17 +128,6 @@ export default function CategoryPage() {
           <Link href="/" className="text-copper-400 hover:text-copper-300 underline">
             Ana sayfaya dön
           </Link>
-        </div>
-      </div>
-    )
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-copper-500 border-r-transparent mb-4"></div>
-          <p className="text-copper-300 font-playfair text-xl">Yükleniyor...</p>
         </div>
       </div>
     )

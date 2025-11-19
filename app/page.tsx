@@ -8,20 +8,31 @@ import CategoryCard from '@/components/CategoryCard'
 import { fetchMenuData, MenuItem } from '@/lib/googleSheets'
 import { useRouter } from 'next/navigation'
 
-// Kategori bilgileri
+// Kategori bilgileri - Google Sheets'teki kategorilere göre güncellendi
 const categoryInfo = [
-  { title: 'Başlangıçlar', slug: 'baslangiclar', description: 'Sıcak çorbalar ile başlayın', icon: 'soup' },
-  { title: 'Mezeler', slug: 'mezeler', description: 'Soğuk mezeler ve lezzetler', icon: 'dish' },
-  { title: 'Ara Sıcaklar', slug: 'ara-sicaklar', description: 'Sıcak atıştırmalıklar', icon: 'flame' },
-  { title: 'Salatalar', slug: 'salatalar', description: 'Taze ve sağlıklı', icon: 'salad' },
+  { title: 'Sıcak Mezeler', slug: 'sicak-mezeler', description: 'Sıcak mezeler ve lezzetler', icon: 'flame' },
+  { title: 'Soğuk Mezeler', slug: 'soguk-mezeler', description: 'Soğuk mezeler ve lezzetler', icon: 'dish' },
   { title: 'Ana Yemekler', slug: 'ana-yemekler', description: 'Közden gelen lezzetler', icon: 'meat' },
-  { title: 'Spesyaller', slug: 'spesyaller', description: 'Özel tariflerimiz', icon: 'star' },
-  { title: 'Tatlılar', slug: 'tatlilar', description: 'Geleneksel tatlılar', icon: 'cake' },
-  { title: 'İçecekler', slug: 'icecekler', description: 'Sıcak ve soğuk içecekler', icon: 'coffee' },
-  { title: 'Alkoller', slug: 'alkoller', description: 'Rakı, şarap, bira ve daha fazlası', icon: 'wine' },
-  { title: 'Aperatifler', slug: 'aperatifler', description: 'Kuruyemiş çeşitleri', icon: 'nuts' },
-  { title: 'Meyveler', slug: 'meyveler', description: 'Taze mevsim meyveleri', icon: 'fruit' },
+  { title: 'Salatalar', slug: 'salatalar', description: 'Taze ve sağlıklı', icon: 'salad' },
 ]
+
+// Kategori başlığından slug oluşturma fonksiyonu
+function getCategorySlug(categoryTitle: string): string {
+  const category = categoryInfo.find(c => c.title === categoryTitle)
+  if (category) return category.slug
+  
+  // Eğer kategori listede yoksa, otomatik slug oluştur
+  return categoryTitle
+    .toLowerCase()
+    .replace(/ş/g, 's')
+    .replace(/ğ/g, 'g')
+    .replace(/ü/g, 'u')
+    .replace(/ö/g, 'o')
+    .replace(/ı/g, 'i')
+    .replace(/ç/g, 'c')
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+}
 
 export default function Home() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
@@ -48,7 +59,7 @@ export default function Home() {
 
   // Arama sonucu seçildiğinde kategori sayfasına git
   const handleSelectItem = (item: MenuItem) => {
-    const categorySlug = categoryInfo.find(c => c.title === item.category)?.slug
+    const categorySlug = getCategorySlug(item.category)
     if (categorySlug) {
       router.push(`/kategori/${categorySlug}?highlight=${encodeURIComponent(item.productName)}`)
     }
@@ -87,21 +98,34 @@ export default function Home() {
 
         {/* Category Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-          {categoryInfo.map(category => {
-            const items = getItemsByCategory(category.title)
-            if (items.length === 0) return null
+          {(() => {
+            // Google Sheets'ten gelen kategorileri dinamik olarak göster
+            const categoriesFromData = Array.from(new Set(menuItems.map(item => item.category).filter(Boolean)))
             
-            return (
-              <CategoryCard
-                key={category.slug}
-                title={category.title}
-                description={category.description}
-                itemCount={items.length}
-                slug={category.slug}
-                icon={category.icon}
-              />
-            )
-          })}
+            return categoriesFromData.map(categoryTitle => {
+              const items = getItemsByCategory(categoryTitle)
+              if (items.length === 0) return null
+              
+              // Kategori bilgisini bul veya varsayılan değerler kullan
+              const category = categoryInfo.find(c => c.title === categoryTitle) || {
+                title: categoryTitle,
+                slug: getCategorySlug(categoryTitle),
+                description: `${categoryTitle} kategorisindeki lezzetler`,
+                icon: 'dish' // Varsayılan icon
+              }
+              
+              return (
+                <CategoryCard
+                  key={category.slug}
+                  title={category.title}
+                  description={category.description}
+                  itemCount={items.length}
+                  slug={category.slug}
+                  icon={category.icon}
+                />
+              )
+            })
+          })()}
         </div>
       </main>
 

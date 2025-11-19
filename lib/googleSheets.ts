@@ -42,14 +42,19 @@ export async function fetchMenuData(): Promise<MenuItem[]> {
     const jsonString = data.substring(47).slice(0, -2)
     const json: GoogleSheetsResponse = JSON.parse(jsonString)
     
-    const menuItems: MenuItem[] = json.table.rows.map(row => ({
-      productName: row.c[0]?.v || '',
-      productDescription: row.c[1]?.v || generateMenuDescription(row.c[0]?.v || ''),
-      productPrice: row.c[2]?.v || '',
-      productImage: row.c[3]?.v || '/products/no-image.jpg',
-      category: row.c[4]?.v || '',
-      subCategory: row.c[5]?.v || '', // 6. sütun: Alt kategori
-    }))
+    // İlk satırı (başlık satırı) atla ve verileri doğru sütunlardan al
+    // Google Sheets sütun sırası: A=Ürün Adı, B=Ürün Fiyatı, C=Kategori, D=Alt Kategori, E=Ürün Açıklaması, F=Ürün Resmi
+    const menuItems: MenuItem[] = json.table.rows
+      .slice(1) // İlk satırı (başlık) atla
+      .map(row => ({
+        productName: row.c[0]?.v || '', // A sütunu: Ürün Adı
+        productPrice: row.c[1]?.v || '', // B sütunu: Ürün Fiyatı
+        category: row.c[2]?.v || '', // C sütunu: Kategori
+        subCategory: row.c[3]?.v || '', // D sütunu: Alt Kategori
+        productDescription: row.c[4]?.v || generateMenuDescription(row.c[0]?.v || ''), // E sütunu: Ürün Açıklaması
+        productImage: row.c[5]?.v || '/products/no-image.jpg', // F sütunu: Ürün Resmi
+      }))
+      .filter(item => item.productName && item.productName.trim() !== '') // Boş satırları filtrele
     
     return menuItems
   } catch (error) {
